@@ -37,7 +37,7 @@
             num_dice: 1,
             num_sides: 6,
             random_dice: [],
-            pokemon: null,
+            pokemons: [],              // ✅ array of pokemon
             loadingPokemon: false
           };
         }
@@ -58,32 +58,19 @@
           }
         }
 
-        changeNumDice(event) {
-          // ensure number, not string
-          this.setState({ num_dice: Number(event.target.value) });
-        }
-
-        fetchPokemon(pokemonId) {
-          this.setState({ loadingPokemon: true });
-
-          fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`)
+        // Fetch a single pokemon and return the data (not setState here)
+        fetchPokemonData(pokemonId) {
+          return fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`)
             .then((res) => {
               if (!res.ok) throw new Error("PokéAPI request failed");
               return res.json();
             })
-            .then((data) => {
-              this.setState({
-                pokemon: {
-                  name: data.name,
-                  sprite: data.sprites.front_default
-                },
-                loadingPokemon: false
-              });
-            })
-            .catch((err) => {
-              console.error(err);
-              this.setState({ loadingPokemon: false });
-            });
+            .then((data) => ({
+              id: pokemonId,
+              name: data.name,
+              sprite: data.sprites.front_default,
+              stats: data.stats
+            }));
         }
 
         makeDice() {
@@ -91,21 +78,28 @@
           const total = Number(this.state.num_dice) || 1;
 
           const dice = [];
-          let highestRoll = 1;
 
           for (let i = 0; i < total; i++) {
             const die_value = Math.floor(Math.random() * max + 1);
             dice[i] = { key: i, value: die_value };
-
-            if (die_value > highestRoll) highestRoll = die_value;
           }
 
-          // Update dice first
-          this.setState({ random_dice: dice });
+          // show dice immediately
+          this.setState({ random_dice: dice, loadingPokemon: true, pokemons: [] });
 
-          // Use highest roll as Pokémon ID (cap to valid range)
-          const pokemonId = Math.min(highestRoll, 1010);
-          this.fetchPokemon(pokemonId);
+          // ✅ make pokemon IDs based on EACH die roll
+          // (cap 1–1010 so it’s always valid)
+          const pokemonIds = dice.map((d) => Math.min(Math.max(d.value, 1), 1010));
+
+          // ✅ fetch them all in parallel
+          Promise.all(pokemonIds.map((id) => this.fetchPokemonData(id)))
+            .then((pokemonList) => {
+              this.setState({ pokemons: pokemonList, loadingPokemon: false });
+            })
+            .catch((err) => {
+              console.error(err);
+              this.setState({ loadingPokemon: false });
+            });
         }
 
         render() {
@@ -124,6 +118,38 @@
                     />
                   ))}
                 </div>
+
+                {/* ✅ Pokemon list appears BELOW the dice */}
+                {this.state.loadingPokemon && <p>Loading Pokémon...</p>}
+
+                {this.state.pokemons.length > 0 && (
+                  <div className="pokemon-list">
+                    <h2>Pokémon Rolled:</h2>
+
+                    {this.state.pokemons.map((p, idx) => (
+                      <div className="pokemon-card" key={idx}>
+                        <h3>
+                          #{idx + 1}: {p.name.toUpperCase()}
+                        </h3>
+
+                        {p.sprite ? (
+                          <img src={p.sprite} alt={p.name} />
+                        ) : (
+                          <p>(No sprite available)</p>
+                        )}
+
+                        <h4>Stats:</h4>
+                        <ul>
+                          {p.stats.map((statObj, sidx) => (
+                            <li key={sidx}>
+                              {statObj.stat.name.toUpperCase()}: {statObj.base_stat}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           }
@@ -146,7 +172,6 @@
               <span>Number of Sides! </span>
               <span>{this.state.num_sides} </span>
 
-              {/* In React, use className not class */}
               <button className="minus" onClick={() => this.increaseSides()}>
                 +
               </button>
@@ -155,7 +180,9 @@
               </button>
               <button
                 className="clear"
-                onClick={() => this.setState({ random_dice: [], pokemon: null })}
+                onClick={() =>
+                  this.setState({ random_dice: [], pokemons: [], loadingPokemon: false })
+                }
               >
                 Clear
               </button>
@@ -171,21 +198,6 @@
 
               <br />
               {displayRandom}
-
-              {/* Pokémon panel (always shown when loading/ready) */}
-              {this.state.loadingPokemon && <p>Loading Pokémon...</p>}
-
-              {this.state.pokemon && (
-                <div className="pokemon-card">
-                  <h2>Pokémon Rolled!</h2>
-                  <h3>{this.state.pokemon.name.toUpperCase()}</h3>
-                  {this.state.pokemon.sprite ? (
-                    <img src={this.state.pokemon.sprite} alt="pokemon" />
-                  ) : (
-                    <p>(No sprite available)</p>
-                  )}
-                </div>
-              )}
             </div>
           );
         }
