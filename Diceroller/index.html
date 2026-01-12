@@ -1,168 +1,197 @@
-
 <!DOCTYPE html>
 <html>
+  <head>
+    <title>Dice Roller</title>
 
-    <head>
+    <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
 
-      <title>Dice Roller</title>
-      <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
-      <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
-      <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
-    
+    <link rel="stylesheet" type="text/css" href="Style.css" />
+  </head>
 
-    <!--link to external CSS stylesheet -->
+  <body>
+    <div id="container"></div>
 
-      <link rel="stylesheet" type="text/css" href="Style.css">
-
-
-    </head>
-    
-   
-<body>
-
-  <div id="container"></div>
-  
-  
-  <script type="text/babel">
-  
-
-  // resources used 
-//https://www.sololearn.com/Discuss/2061733/link-rel-stylesheet-type-text-css-href-mystyle-css-please-how-is-this-used
-//https://discuss.codecademy.com/t/react-component-class-constructor-question/682529
-//https://stackoverflow.com/questions/71039088/what-is-onchange-e-setnamee-target-value-in-react-mean
-//https://react-typescript-cheatsheet.netlify.app/docs/basic/getting-started/forms_and_events/
-//https://stackoverflow.com/questions/51350786/is-reactdom-render-really-needed
-
-    class Dice extends React.Component {
-      render() {
-        return (
-          <div className="grid-item">
-            {this.props.die_value}
-          </div>
-        );
-      }
-    }
-  
-    class RandomDice extends React.Component {
-      constructor(props) {
-        super(props);
-  
-        this.state = {
-          num_dice: 1,
-          num_sides: 6,
-          random_dice: []
-        };
-      }
-//to handle incremented sides 
-      increaseSides(){
-        //max num sides
- let max = 20;
-let newSides = this.state.num_sides + 1;
-//making sure num sides less then 20 
-if(newSides <= max){
-  this.setState({   num_sides: newSides});
-
-
-  }
-
-
-}
-//decreasing sides of dice 
-decreaseSides(){
-let min = 1;
-let newSides = this.state.num_sides -1;
-if(newSides >= min){
-this.setState({num_sides: newSides})
-
-  }
-}
-  
-//chaging number of dice shown
-      changeNumDice(event) {
-        this.setState({ num_dice: event.target.value });
-      }
-        
- 
-      //creating dice showing the max sides number of dice total dice
-
-      makeDice() {
-      let max = this.state.num_sides;
-
-      let dice = [];
-
-      let total = this.state.num_dice;
-
-      for (let i = 0; i < total; i++) {
-        let die_value = Math.floor(Math.random() * max + 1);
-        console.log(die_value);
-
-        dice[i] = { key: i, value: die_value };
-      }
-
-      // set the new random_dice value
-      this.setState({ random_dice: dice });
-    }
-
-  
+    <script type="text/babel">
+      class Dice extends React.Component {
         render() {
-           let displayRandom = <h2>Click button above to generate Dice!</h2>;
-          
-        if (this.state.random_dice.length > 0) {
+          const { die_value, num_sides } = this.props;
+
+          let shapeClass = "grid-item die-standard";
+          if (num_sides === 3) {
+            shapeClass = "grid-item die-triangle";
+          } else if (num_sides === 20) {
+            shapeClass = "grid-item die-d20";
+          }
+
+          return <div className={shapeClass}>{die_value}</div>;
+        }
+      }
+
+      class RandomDice extends React.Component {
+        constructor(props) {
+          super(props);
+
+          this.state = {
+            num_dice: 1,
+            num_sides: 6,
+            random_dice: [],
+            pokemon: null,
+            loadingPokemon: false
+          };
+        }
+
+        increaseSides() {
+          const max = 20;
+          const newSides = this.state.num_sides + 1;
+          if (newSides <= max) {
+            this.setState({ num_sides: newSides });
+          }
+        }
+
+        decreaseSides() {
+          const min = 1;
+          const newSides = this.state.num_sides - 1;
+          if (newSides >= min) {
+            this.setState({ num_sides: newSides });
+          }
+        }
+
+        changeNumDice(event) {
+          // ensure number, not string
+          this.setState({ num_dice: Number(event.target.value) });
+        }
+
+        fetchPokemon(pokemonId) {
+          this.setState({ loadingPokemon: true });
+
+          fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`)
+            .then((res) => {
+              if (!res.ok) throw new Error("PokéAPI request failed");
+              return res.json();
+            })
+            .then((data) => {
+              this.setState({
+                pokemon: {
+                  name: data.name,
+                  sprite: data.sprites.front_default
+                },
+                loadingPokemon: false
+              });
+            })
+            .catch((err) => {
+              console.error(err);
+              this.setState({ loadingPokemon: false });
+            });
+        }
+
+        makeDice() {
+          const max = this.state.num_sides;
+          const total = Number(this.state.num_dice) || 1;
+
+          const dice = [];
+          let highestRoll = 1;
+
+          for (let i = 0; i < total; i++) {
+            const die_value = Math.floor(Math.random() * max + 1);
+            dice[i] = { key: i, value: die_value };
+
+            if (die_value > highestRoll) highestRoll = die_value;
+          }
+
+          // Update dice first
+          this.setState({ random_dice: dice });
+
+          // Use highest roll as Pokémon ID (cap to valid range)
+          const pokemonId = Math.min(highestRoll, 1010);
+          this.fetchPokemon(pokemonId);
+        }
+
+        render() {
+          let displayRandom = <h2>Click button above to generate Dice!</h2>;
+
+          if (this.state.random_dice.length > 0) {
             displayRandom = (
               <div>
                 <h2>Random Dice:</h2>
                 <div className="grid-container">
-                  {this.state.random_dice.map((die, index) =>(
-
-                    <Dice key={index} die_value={die.value} />
-
-
-
+                  {this.state.random_dice.map((die, index) => (
+                    <Dice
+                      key={index}
+                      die_value={die.value}
+                      num_sides={this.state.num_sides}
+                    />
                   ))}
                 </div>
               </div>
             );
           }
-          
-        return (
+
+          return (
             <div>
               <h1>Dice Roller</h1>
-              <span>Number of Dice rolled: </span>
-              <input type="number" 
-                     value={this.state.num_dice} 
-                     onChange={(e) => this.setState({num_dice: e.target.value})} 
-                     />
-              <br />
-               <br />
-           
-              <span>Number of Sides! </span>
-              
-              <span>{this.state.num_sides} </span>
-              <button class="minus" onClick={() => this.increaseSides()}>+</button>
-              <button class="plus"onClick={() => this.decreaseSides()}>-</button>
-              <button class="clear"onClick={() => this.setState({ random_dice: []})}>Clear</button>
 
-                <br />
-               <br />
-              <input type="button" 
-                     onClick={() => this.makeDice()}
-                     value="Generate Random Dice" />
+              <span>Number of Dice rolled: </span>
+              <input
+                type="number"
+                value={this.state.num_dice}
+                onChange={(e) => this.setState({ num_dice: Number(e.target.value) })}
+                min="1"
+              />
+
+              <br />
+              <br />
+
+              <span>Number of Sides! </span>
+              <span>{this.state.num_sides} </span>
+
+              {/* In React, use className not class */}
+              <button className="minus" onClick={() => this.increaseSides()}>
+                +
+              </button>
+              <button className="plus" onClick={() => this.decreaseSides()}>
+                -
+              </button>
+              <button
+                className="clear"
+                onClick={() => this.setState({ random_dice: [], pokemon: null })}
+              >
+                Clear
+              </button>
+
+              <br />
+              <br />
+
+              <input
+                type="button"
+                onClick={() => this.makeDice()}
+                value="Generate Random Dice"
+              />
+
               <br />
               {displayRandom}
+
+              {/* Pokémon panel (always shown when loading/ready) */}
+              {this.state.loadingPokemon && <p>Loading Pokémon...</p>}
+
+              {this.state.pokemon && (
+                <div className="pokemon-card">
+                  <h2>Pokémon Rolled!</h2>
+                  <h3>{this.state.pokemon.name.toUpperCase()}</h3>
+                  {this.state.pokemon.sprite ? (
+                    <img src={this.state.pokemon.sprite} alt="pokemon" />
+                  ) : (
+                    <p>(No sprite available)</p>
+                  )}
+                </div>
+              )}
             </div>
           );
         }
       }
-      
 
-
-        
-
-ReactDOM.render(
-  <RandomDice />,
-  document.querySelector("#container")
-)
-      </script>
-    </body>
-    
-    </html>
+      ReactDOM.render(<RandomDice />, document.querySelector("#container"));
+    </script>
+  </body>
+</html>
