@@ -36,8 +36,9 @@
           this.state = {
             num_dice: 1,
             num_sides: 6,
+            gen: 1,                 // ✅ ADD THIS
             random_dice: [],
-            pokemons: [],              // ✅ array of pokemon
+            pokemons: [],
             loadingPokemon: false
           };
         }
@@ -73,12 +74,34 @@
             }));
         }
 
+        // ✅ Generation → National Dex ranges
+        getGenRange(gen) {
+          const ranges = {
+            1: [1, 151],
+            2: [152, 251],
+            3: [252, 386],
+            4: [387, 493],
+            5: [494, 649],
+            6: [650, 721],
+            7: [722, 809],
+          };
+          return ranges[gen] || [1, 151];
+        }
+
+        // ✅ Convert a die roll into an ID inside the selected gen
+        rollToPokemonId(rollValue) {
+          const [start, end] = this.getGenRange(this.state.gen);
+          const count = end - start + 1;
+
+          const offset = (rollValue - 1) % count;
+          return start + offset;
+        }
+
         makeDice() {
           const max = this.state.num_sides;
           const total = Number(this.state.num_dice) || 1;
 
           const dice = [];
-
           for (let i = 0; i < total; i++) {
             const die_value = Math.floor(Math.random() * max + 1);
             dice[i] = { key: i, value: die_value };
@@ -87,11 +110,9 @@
           // show dice immediately
           this.setState({ random_dice: dice, loadingPokemon: true, pokemons: [] });
 
-          // ✅ make pokemon IDs based on EACH die roll
-          // (cap 1–1010 so it’s always valid)
-          const pokemonIds = dice.map((d) => Math.min(Math.max(d.value, 1), 1010));
+          // ✅ pokemon IDs based on EACH die roll + selected gen
+          const pokemonIds = dice.map((d) => this.rollToPokemonId(d.value));
 
-          // ✅ fetch them all in parallel
           Promise.all(pokemonIds.map((id) => this.fetchPokemonData(id)))
             .then((pokemonList) => {
               this.setState({ pokemons: pokemonList, loadingPokemon: false });
@@ -119,7 +140,6 @@
                   ))}
                 </div>
 
-                {/* ✅ Pokemon list appears BELOW the dice */}
                 {this.state.loadingPokemon && <p>Loading Pokémon...</p>}
 
                 {this.state.pokemons.length > 0 && (
@@ -158,6 +178,22 @@
             <div>
               <h1>Dice Roller</h1>
 
+              <h2>Generation of Pokémon</h2>
+              <select
+                value={this.state.gen}
+                onChange={(e) => this.setState({ gen: Number(e.target.value) })}  // ✅ FIXED
+              >
+                <option value={1}>Gen 1</option>
+                <option value={2}>Gen 2</option>
+                <option value={3}>Gen 3</option>
+                <option value={4}>Gen 4</option>
+                <option value={5}>Gen 5</option>
+                <option value={6}>Gen 6</option>
+                <option value={7}>Gen 7</option>
+              </select>
+
+              <br /><br />
+
               <span>Number of Dice rolled: </span>
               <input
                 type="number"
@@ -166,8 +202,7 @@
                 min="1"
               />
 
-              <br />
-              <br />
+              <br /><br />
 
               <span>Number of Sides! </span>
               <span>{this.state.num_sides} </span>
@@ -178,6 +213,7 @@
               <button className="plus" onClick={() => this.decreaseSides()}>
                 -
               </button>
+
               <button
                 className="clear"
                 onClick={() =>
@@ -187,8 +223,7 @@
                 Clear
               </button>
 
-              <br />
-              <br />
+              <br /><br />
 
               <input
                 type="button"
